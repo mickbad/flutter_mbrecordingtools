@@ -1,0 +1,39 @@
+name: mbrecordingtools
+description: Plugin Flutter pour l'enregistrement audio en arrière-plan avec transcription Whisper GGML et analyse waveform.
+version: 1.0.0
+homepage: https://ricochets.dev
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.10.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Audio recording
+  record: ^6.0.0
+
+  # Background service
+  flutter_background_service: ^5.1.0
+
+  # Local notifications
+  flutter_local_notifications: ^19.5.0
+
+  # Device info for RAM detection
+  device_info_plus: ^10.1.0
+
+  # Path provider
+  path_provider: ^2.1.3
+
+  # UUID for file naming
+  uuid: ^4.5.2
+
+  # Whisper GGML for speech-to-text
+  whisper_ggml: ^1.7.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
