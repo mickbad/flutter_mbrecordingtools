@@ -127,7 +127,7 @@ class BackgroundSTTService {
             '[BackgroundSTTService] RAM Android détectée: ${_availableRamGB?.toStringAsFixed(1)} GB (raw: $totalMem bytes)');
       } else {
         // Fallback: estimation basée sur le modèle et la version Android
-        _availableRamGB = _estimateAndroidRam(androidInfo.model ?? 'unknown');
+        _availableRamGB = _estimateAndroidRam(androidInfo.model);
         debugPrint(
             '[BackgroundSTTService] Estimation RAM Android: ${_availableRamGB?.toStringAsFixed(1)} GB');
       }

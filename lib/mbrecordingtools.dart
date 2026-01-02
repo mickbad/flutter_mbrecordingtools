@@ -16,6 +16,8 @@ export 'background_stt_labels.dart';
 
 // Exports pour les composants UI
 export 'background_audio_waveform_design.dart';
+export 'background_audio_historic_waveform_design.dart';
+export 'background_audio_single_waveform.dart';
 
 // Réexport des types principaux des packages externes
 export 'package:record/record.dart'

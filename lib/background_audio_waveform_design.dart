@@ -4,13 +4,24 @@ import 'package:flutter/material.dart';
 import 'background_audio.dart';
 
 ///
-/// Waveform bar widget
+/// Waveform bar widget avec dégradé à 3 couleurs
+/// Séquence de dégradé: colorStart (début) → color (milieu) → colorEnd (fin)
 ///
 class BackgroundAudioWaveformBar extends StatelessWidget {
   ///
-  /// Color
+  /// Color du milieu
   ///
   final Color color;
+
+  ///
+  /// Color de début du dégradé
+  ///
+  final Color colorStart;
+
+  ///
+  /// Color de fin du dégradé
+  ///
+  final Color colorEnd;
 
   ///
   /// Bar style
@@ -18,12 +29,18 @@ class BackgroundAudioWaveformBar extends StatelessWidget {
   final BorderRadius borderRadius;
 
   final double value;
+  final int index;
+  final int totalBars;
   final Random _random = Random();
 
   BackgroundAudioWaveformBar({
     super.key,
     required this.value,
+    this.index = 0,
+    this.totalBars = 1,
     this.color = Colors.redAccent,
+    this.colorStart = Colors.blueAccent,
+    this.colorEnd = Colors.greenAccent,
     this.borderRadius = const BorderRadius.only(
       topLeft: Radius.circular(4),
       topRight: Radius.circular(4),
@@ -32,18 +49,43 @@ class BackgroundAudioWaveformBar extends StatelessWidget {
     // Ne pas modifier la graine aléatoire pour maintenir la cohérence
   }
 
+  /// Fonction utilitaire pour interpoler entre deux couleurs
+  Color _interpolateColor(Color start, Color end, double factor) {
+    return Color.lerp(start, end, factor) ?? start;
+  }
+
+  /// Obtenir la couleur de la barre selon sa position dans le dégradé
+  Color _getBarColor() {
+    if (totalBars <= 1) return color;
+
+    final factor =
+        index / (totalBars - 1); // 0.0 pour la première, 1.0 pour la dernière
+
+    if (factor <= 0.5) {
+      // Première moitié : colorStart → color
+      final adjustedFactor = factor * 2; // 0.0 à 1.0
+      return _interpolateColor(colorStart, color, adjustedFactor);
+    } else {
+      // Seconde moitié : color → colorEnd
+      final adjustedFactor = (factor - 0.5) * 2; // 0.0 à 1.0
+      return _interpolateColor(color, colorEnd, adjustedFactor);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Ajouter un peu de variation à chaque barre
     final variation = _random.nextDouble() * 0.3 - 0.15; // -0.15 à +0.15
     final adjustedValue = (value + variation).clamp(0.0, 1.0);
 
+    final barColor = _getBarColor();
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 80),
       width: 6,
       height: 10 + (adjustedValue * 80),
       decoration: BoxDecoration(
-        color: color,
+        color: barColor,
         borderRadius: borderRadius,
       ),
     );
@@ -51,13 +93,24 @@ class BackgroundAudioWaveformBar extends StatelessWidget {
 }
 
 ///
-/// Waveform widget
+/// Waveform widget avec dégradé à 3 couleurs
+/// Séquence de dégradé: colorStart (début) → color (milieu) → colorEnd (fin)
 ///
 class BackgroundAudioLiveWaveform extends StatelessWidget {
   ///
-  /// Color
+  /// Color du milieu
   ///
   final Color color;
+
+  ///
+  /// Color de début du dégradé (optionnel, utilise color si null)
+  ///
+  final Color? colorStart;
+
+  ///
+  /// Color de fin du dégradé (optionnel, utilise color si null)
+  ///
+  final Color? colorEnd;
 
   ///
   /// Bar style
@@ -77,6 +130,8 @@ class BackgroundAudioLiveWaveform extends StatelessWidget {
   const BackgroundAudioLiveWaveform({
     super.key,
     this.color = Colors.redAccent,
+    this.colorStart,
+    this.colorEnd,
     this.borderRadius = const BorderRadius.only(
       topLeft: Radius.circular(4),
       topRight: Radius.circular(4),
@@ -107,7 +162,10 @@ class BackgroundAudioLiveWaveform extends StatelessWidget {
               child: _VariedWaveformBar(
                 baseValue: value,
                 index: index,
+                totalBars: countRealBar,
                 color: color,
+                colorStart: colorStart,
+                colorEnd: colorEnd,
                 borderRadius: borderRadius,
               ),
             ),
@@ -121,13 +179,19 @@ class BackgroundAudioLiveWaveform extends StatelessWidget {
 class _VariedWaveformBar extends StatefulWidget {
   final double baseValue;
   final int index;
+  final int totalBars;
   final Color color;
+  final Color? colorStart;
+  final Color? colorEnd;
   final BorderRadius borderRadius;
 
   const _VariedWaveformBar({
     required this.baseValue,
     required this.index,
+    required this.totalBars,
     required this.color,
+    required this.colorStart,
+    required this.colorEnd,
     required this.borderRadius,
   });
 
@@ -156,14 +220,47 @@ class _VariedWaveformBarState extends State<_VariedWaveformBar> {
     }
   }
 
+  /// Fonction utilitaire pour interpoler entre deux couleurs
+  Color _interpolateColor(Color start, Color end, double factor) {
+    return Color.lerp(start, end, factor) ?? start;
+  }
+
+  /// Obtenir les couleurs effectives (avec fallback vers color)
+  Color _getEffectiveColorStart() => widget.colorStart ?? widget.color;
+  Color _getEffectiveColorEnd() => widget.colorEnd ?? widget.color;
+
+  /// Obtenir la couleur de la barre selon sa position dans le dégradé
+  Color _getBarColor() {
+    if (widget.totalBars <= 1) return widget.color;
+
+    final factor = widget.index /
+        (widget.totalBars - 1); // 0.0 pour la première, 1.0 pour la dernière
+
+    final effectiveColorStart = _getEffectiveColorStart();
+    final effectiveColorEnd = _getEffectiveColorEnd();
+
+    if (factor <= 0.5) {
+      // Première moitié : colorStart → color
+      final adjustedFactor = factor * 2; // 0.0 à 1.0
+      return _interpolateColor(
+          effectiveColorStart, widget.color, adjustedFactor);
+    } else {
+      // Seconde moitié : color → colorEnd
+      final adjustedFactor = (factor - 0.5) * 2; // 0.0 à 1.0
+      return _interpolateColor(widget.color, effectiveColorEnd, adjustedFactor);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final barColor = _getBarColor();
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 100),
       width: 6,
       height: _currentHeight,
       decoration: BoxDecoration(
-        color: widget.color,
+        color: barColor,
         borderRadius: widget.borderRadius,
       ),
     );

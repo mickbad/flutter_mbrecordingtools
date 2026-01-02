@@ -50,7 +50,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Audio-Recording Ricochets.dev',
+      title: 'Recording Ricochets.dev',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.lightBlue),
         useMaterial3: true,
@@ -73,13 +73,30 @@ class _MyHomePageState extends State<MyHomePage> {
   final AudioRecorder audioRecorder = AudioRecorder();
   final AudioPlayer audioPlayer = AudioPlayer();
 
+  // Langue sélectionnée
+  String _selectedLanguage = 'auto';
+
+  // Fonction pour obtenir l'émoji du drapeau selon la langue
+  Widget _getLanguageIcon() {
+    switch (_selectedLanguage) {
+      case 'auto':
+        return const Text('🌍', style: TextStyle(fontSize: 20));
+      case 'fr':
+        return const Text('🇫🇷', style: TextStyle(fontSize: 20));
+      case 'en':
+        return const Text('🇺🇸', style: TextStyle(fontSize: 20));
+      default:
+        return const Icon(Icons.language);
+    }
+  }
+
   String instructionsText = "";
   String transcribedText = 'Transcribed text will be displayed here';
   String downloadStatus = "";
   bool isProcessing = false;
   bool isProcessingFile = false;
   bool isListening = false;
-  bool showTimer = true;
+  bool showOptionView = true;
   bool isDownloading = false;
   double downloadProgress = 0.0;
   Duration recordingDuration = Duration.zero;
@@ -293,10 +310,43 @@ class _MyHomePageState extends State<MyHomePage> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: const Text('Audio-Recording Ricochets.dev'),
+        title: const Text('Recording Ricochets.dev'),
         actions: [
+          // langue
+          PopupMenuButton<String>(
+            icon: _getLanguageIcon(),
+            tooltip: "Select your language spoken",
+            onSelected: (lang) {
+              setState(() {
+                _selectedLanguage = lang;
+              });
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'auto',
+                child: Row(spacing: 8, children: [Text('🌍'), Text('auto')]),
+              ),
+              const PopupMenuItem(
+                value: 'fr',
+                child: Row(
+                  spacing: 8,
+                  children: [Text('🇫🇷'), Text('french')],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'en',
+                child: Row(
+                  spacing: 8,
+                  children: [Text('🇺🇸'), Text('english')],
+                ),
+              ),
+            ],
+          ),
+
+          // modèles
           PopupMenuButton<WhisperModel>(
             icon: const Icon(Icons.model_training),
+            tooltip: "Select your spoken model",
             onSelected: (model) async {
               if (BackgroundSTTService.isRamInsufficient(model)) {
                 _showRamInsufficientDialog(model);
@@ -421,17 +471,91 @@ class _MyHomePageState extends State<MyHomePage> {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            Container(
-                              height: 100,
-                              padding: EdgeInsets.all(8.0),
-                              child: SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: BackgroundAudioLiveWaveform(
-                                  color: Colors.blueAccent,
-                                  countBar: 30,
-                                ),
+
+                            if (showOptionView) ...[
+                              Wrap(
+                                alignment: WrapAlignment.center,
+                                spacing: 8.0,
+                                runSpacing: 8.0,
+                                children: [
+                                  // waveform instantanée
+                                  Container(
+                                    height: 100,
+                                    padding: EdgeInsets.all(8.0),
+                                    child: SingleChildScrollView(
+                                      scrollDirection: Axis.horizontal,
+                                      child: BackgroundAudioLiveWaveform(
+                                        colorStart: Colors.blueAccent.shade100,
+                                        color: Colors.blue.shade700,
+                                        colorEnd: Colors.blueAccent.shade100,
+                                        countBar: 30,
+                                      ),
+                                    ),
+                                  ),
+
+                                  // waveform historique
+                                  Container(
+                                    height: 100,
+                                    padding: EdgeInsets.all(8.0),
+                                    child: SingleChildScrollView(
+                                      scrollDirection: Axis.horizontal,
+                                      child:
+                                          BackgroundAudioLiveHistoricWaveform(
+                                            colorStart: Colors.redAccent,
+                                            color: Colors.purpleAccent,
+                                            colorEnd: Colors.blueAccent,
+                                            countBar: 30,
+                                          ),
+                                    ),
+                                  ),
+
+                                  // jauge simple
+                                  Container(
+                                    width: 55,
+                                    height: 26,
+                                    padding: EdgeInsets.all(8.0),
+
+                                    child: BackgroundAudioLiveSingleWaveform(
+                                      colorStart: Colors.blueAccent.shade700,
+                                      color: Colors.purpleAccent,
+                                      colorEnd: Colors.blueAccent.shade200,
+                                      orientation:
+                                          WaveformOrientation.horizontal,
+                                      animationDurationMs: 25,
+                                    ),
+                                  ),
+
+                                  // jauge simple
+                                  Container(
+                                    width: 30,
+                                    height: 100,
+                                    padding: EdgeInsets.all(8.0),
+
+                                    child: BackgroundAudioLiveSingleWaveform(
+                                      colorStart: Colors.redAccent,
+                                      color: Colors.purpleAccent,
+                                      colorEnd: Colors.blueAccent,
+                                      orientation: WaveformOrientation.vertical,
+                                    ),
+                                  ),
+
+                                  // jauge simple plus réactif
+                                  Container(
+                                    width: 30,
+                                    height: 100,
+                                    padding: EdgeInsets.all(8.0),
+
+                                    child: BackgroundAudioLiveSingleWaveform(
+                                      colorStart: Colors.redAccent,
+                                      color: Colors.purpleAccent,
+                                      colorEnd: Colors.blueAccent,
+                                      orientation: WaveformOrientation.vertical,
+                                      animationDurationMs: 25,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
+                            ],
                           ],
                         ],
                       ),
@@ -441,10 +565,10 @@ class _MyHomePageState extends State<MyHomePage> {
                   Row(
                     children: [
                       Switch(
-                        value: showTimer,
+                        value: showOptionView,
                         onChanged: (value) {
                           setState(() {
-                            showTimer = value;
+                            showOptionView = value;
                           });
                         },
                       ),
@@ -531,7 +655,7 @@ class _MyHomePageState extends State<MyHomePage> {
         try {
           final result = await BackgroundSTTService.transcribe(
             audioPath: audioPath,
-            lang: 'auto',
+            lang: _selectedLanguage,
           );
 
           if (mounted) {
@@ -590,7 +714,7 @@ class _MyHomePageState extends State<MyHomePage> {
     try {
       final result = await BackgroundSTTService.transcribe(
         audioPath: convertedFile.path,
-        lang: 'auto',
+        lang: _selectedLanguage,
       );
 
       setState(() {

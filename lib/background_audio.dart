@@ -383,7 +383,7 @@ class BackgroundAudioService {
       if (!_isRecording) return;
 
       // borne inférieure de l'amplitude
-      const double minAmplitude = 60.0;
+      const double minAmplitude = 65.0;
 
       // L'amplitude du package record est normalisée entre [-minAmplitude] (silence) et 0 (max)
       double normalized;
