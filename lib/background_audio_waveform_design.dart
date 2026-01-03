@@ -28,6 +28,11 @@ class BackgroundAudioWaveformBar extends StatelessWidget {
   ///
   final BorderRadius borderRadius;
 
+  ///
+  /// Épaisseur du trait des barres (largeur)
+  ///
+  final double strokeWidth;
+
   final double value;
   final int index;
   final int totalBars;
@@ -45,6 +50,7 @@ class BackgroundAudioWaveformBar extends StatelessWidget {
       topLeft: Radius.circular(4),
       topRight: Radius.circular(4),
     ),
+    this.strokeWidth = 4.0,
   }) {
     // Ne pas modifier la graine aléatoire pour maintenir la cohérence
   }
@@ -82,7 +88,7 @@ class BackgroundAudioWaveformBar extends StatelessWidget {
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 80),
-      width: 6,
+      width: strokeWidth,
       height: 10 + (adjustedValue * 80),
       decoration: BoxDecoration(
         color: barColor,
@@ -127,6 +133,11 @@ class BackgroundAudioLiveWaveform extends StatelessWidget {
   ///
   final EdgeInsets padding;
 
+  ///
+  /// Épaisseur du trait des barres (largeur)
+  ///
+  final double strokeWidth;
+
   const BackgroundAudioLiveWaveform({
     super.key,
     this.color = Colors.redAccent,
@@ -138,6 +149,7 @@ class BackgroundAudioLiveWaveform extends StatelessWidget {
     ),
     this.countBar = 20,
     this.padding = const EdgeInsets.symmetric(horizontal: 2),
+    this.strokeWidth = 6.0,
   });
 
   @override
@@ -167,6 +179,7 @@ class BackgroundAudioLiveWaveform extends StatelessWidget {
                 colorStart: colorStart,
                 colorEnd: colorEnd,
                 borderRadius: borderRadius,
+                strokeWidth: strokeWidth,
               ),
             ),
           ),
@@ -184,6 +197,7 @@ class _VariedWaveformBar extends StatefulWidget {
   final Color? colorStart;
   final Color? colorEnd;
   final BorderRadius borderRadius;
+  final double strokeWidth;
 
   const _VariedWaveformBar({
     required this.baseValue,
@@ -193,6 +207,7 @@ class _VariedWaveformBar extends StatefulWidget {
     required this.colorStart,
     required this.colorEnd,
     required this.borderRadius,
+    required this.strokeWidth,
   });
 
   @override
@@ -257,7 +272,7 @@ class _VariedWaveformBarState extends State<_VariedWaveformBar> {
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 100),
-      width: 6,
+      width: widget.strokeWidth,
       height: _currentHeight,
       decoration: BoxDecoration(
         color: barColor,

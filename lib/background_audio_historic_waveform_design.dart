@@ -42,6 +42,11 @@ class BackgroundAudioLiveHistoricWaveform extends StatefulWidget {
   ///
   final int maxHistory;
 
+  ///
+  /// Épaisseur du trait des barres (largeur)
+  ///
+  final double strokeWidth;
+
   const BackgroundAudioLiveHistoricWaveform({
     super.key,
     this.colorStart,
@@ -51,9 +56,10 @@ class BackgroundAudioLiveHistoricWaveform extends StatefulWidget {
       topLeft: Radius.circular(4),
       topRight: Radius.circular(4),
     ),
-    this.countBar = 30,
+    this.countBar = 20,
     this.padding = const EdgeInsets.symmetric(horizontal: 2),
     this.maxHistory = 100,
+    this.strokeWidth = 4.0,
   });
 
   @override
@@ -121,6 +127,7 @@ class _BackgroundAudioLiveHistoricWaveformState
                 color: widget.color,
                 colorEnd: widget.colorEnd,
                 borderRadius: widget.borderRadius,
+                strokeWidth: widget.strokeWidth,
               ),
             ),
           ),
@@ -138,6 +145,7 @@ class _HistoricWaveformBar extends StatelessWidget {
   final Color color;
   final Color? colorEnd;
   final BorderRadius borderRadius;
+  final double strokeWidth;
 
   const _HistoricWaveformBar({
     required this.value,
@@ -147,6 +155,7 @@ class _HistoricWaveformBar extends StatelessWidget {
     required this.color,
     required this.colorEnd,
     required this.borderRadius,
+    required this.strokeWidth,
   });
 
   /// Fonction utilitaire pour interpoler entre deux couleurs
@@ -185,7 +194,7 @@ class _HistoricWaveformBar extends StatelessWidget {
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 150),
-      width: 4,
+      width: strokeWidth,
       height: 10 + (value * 80),
       decoration: BoxDecoration(
         color: barColor,
