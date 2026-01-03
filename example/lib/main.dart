@@ -234,19 +234,19 @@ class _MyHomePageState extends State<MyHomePage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Supprimer le modèle'),
+        title: const Text('Delete Model'),
         content: Text(
-          'Êtes-vous sûr de vouloir supprimer le modèle ${model.modelName} ?\n\n'
-          'Cette action est irréversible.',
+          'Are you sure you want to delete the model ${model.modelName}?\n\n'
+          'This action is irreversible.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler'),
+            child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
