@@ -789,6 +789,26 @@ class BackgroundSTTService {
     }
   }
 
+  /// Retourne la liste des modèles téléchargés localement
+  static Future<List<WhisperModel>> getDownloadedModels() async {
+    final List<WhisperModel> downloadedModels = [];
+
+    for (final model in WhisperModel.values) {
+      if (await modelExists(model)) {
+        downloadedModels.add(model);
+      }
+    }
+
+    // Trier par taille pour un affichage logique
+    downloadedModels.sort((a, b) {
+      final sizeA = modelSizes[a] ?? 0;
+      final sizeB = modelSizes[b] ?? 0;
+      return sizeA.compareTo(sizeB);
+    });
+
+    return downloadedModels;
+  }
+
   /// Supprime un modèle téléchargé
   static Future<bool> deleteModel(WhisperModel model) async {
     try {

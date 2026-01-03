@@ -76,6 +76,10 @@ class _MyHomePageState extends State<MyHomePage> {
   // Langue sélectionnée
   String _selectedLanguage = 'auto';
 
+  // Liste des modèles téléchargés
+  List<WhisperModel> _downloadedModels = [];
+  bool _isLoadingModels = false;
+
   // Fonction pour obtenir l'émoji du drapeau selon la langue
   Widget _getLanguageIcon() {
     switch (_selectedLanguage) {
@@ -106,6 +110,29 @@ class _MyHomePageState extends State<MyHomePage> {
   StreamSubscription<String>? _statusSub;
   StreamSubscription<Map<String, dynamic>>? _progressSub;
 
+  Future<void> _loadDownloadedModels() async {
+    setState(() {
+      _isLoadingModels = true;
+    });
+
+    try {
+      final models = await BackgroundSTTService.getDownloadedModels();
+      if (mounted) {
+        setState(() {
+          _downloadedModels = models;
+          _isLoadingModels = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Erreur lors du chargement des modèles téléchargés: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingModels = false;
+        });
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -118,6 +145,7 @@ class _MyHomePageState extends State<MyHomePage> {
       // Ecouter les flux
       _listenToStreams();
       _checkModelStatus();
+      _loadDownloadedModels();
     });
   }
 
@@ -193,6 +221,104 @@ class _MyHomePageState extends State<MyHomePage> {
         }
       });
     }
+  }
+
+  Future<void> _deleteModel(WhisperModel model) async {
+    // Vérifier s'il reste au moins un autre modèle
+    if (_downloadedModels.length <= 1) {
+      _showCannotDeleteLastModelDialog();
+      return;
+    }
+
+    // Demander confirmation
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Supprimer le modèle'),
+        content: Text(
+          'Êtes-vous sûr de vouloir supprimer le modèle ${model.modelName} ?\n\n'
+          'Cette action est irréversible.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final success = await BackgroundSTTService.deleteModel(model);
+      if (success) {
+        // Attendre un peu pour que la suppression soit complètement effectuée
+        await Future.delayed(const Duration(milliseconds: 100));
+
+        // Recharger la liste des modèles
+        await _loadDownloadedModels();
+
+        // Si le modèle supprimé était le modèle sélectionné, sélectionner un autre
+        if (selectedModel == model) {
+          final availableModels = BackgroundSTTService.getAvailableModels();
+          if (availableModels.isNotEmpty) {
+            setState(() {
+              selectedModel = availableModels.first;
+            });
+            await BackgroundSTTService.loadModel(selectedModel);
+            _checkModelStatus();
+          }
+        }
+      }
+    }
+  }
+
+  void _showCannotDeleteLastModelDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Suppression impossible'),
+        content: const Text(
+          'Vous ne pouvez pas supprimer le dernier modèle restant. '
+          'Téléchargez d\'abord un autre modèle.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _loadModelFromList(WhisperModel model) async {
+    if (BackgroundSTTService.isRamInsufficient(model)) {
+      _showRamInsufficientDialog(model);
+      return;
+    }
+
+    // déchargement
+    await BackgroundSTTService.unloadModel();
+
+    setState(() {
+      selectedModel = model;
+      isDownloading = true;
+      downloadStatus = 'Téléchargement...';
+    });
+
+    await BackgroundSTTService.loadModel(model);
+    _checkModelStatus();
+
+    // Recharger la liste des modèles téléchargés pour afficher le nouveau
+    await _loadDownloadedModels();
+
+    setState(() {
+      isDownloading = false;
+    });
   }
 
   @override
@@ -365,6 +491,9 @@ class _MyHomePageState extends State<MyHomePage> {
               await BackgroundSTTService.loadModel(model);
               _checkModelStatus();
 
+              // Recharger la liste des modèles téléchargés pour afficher le nouveau
+              await _loadDownloadedModels();
+
               setState(() {
                 isDownloading = false;
               });
@@ -400,196 +529,356 @@ class _MyHomePageState extends State<MyHomePage> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Card(
-                    color:
-                        (BackgroundSTTService.availableRamGB == null ||
-                            BackgroundSTTService.availableRamGB! <= 0 ||
-                            isRamInsufficient)
-                        ? Colors.red.shade50
-                        : null,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
+              SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  spacing: 8,
+                  children: [
+                    // Section du modèle actuel
+                    Card(
+                      color:
+                          (BackgroundSTTService.availableRamGB == null ||
+                              BackgroundSTTService.availableRamGB! <= 0 ||
+                              isRamInsufficient)
+                          ? Colors.red.shade50
+                          : null,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  'Model: ${selectedModel.modelName} (${BackgroundSTTService.modelSizes[selectedModel]} MB)',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Icon(
+                                  isModelLoaded
+                                      ? Icons.check_circle
+                                      : Icons.warning,
+                                  color: isModelLoaded
+                                      ? Colors.green
+                                      : Colors.orange,
+                                  size: 16,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              BackgroundSTTService.getRamStatus(selectedModel),
+                              style: TextStyle(
+                                color: isRamInsufficient ? Colors.red : null,
+                                fontWeight: isRamInsufficient
+                                    ? FontWeight.bold
+                                    : null,
+                              ),
+                            ),
+                            if (!isModelLoaded &&
+                                !BackgroundSTTService.isLoading)
+                              const Text(
+                                '⚠️ Model unloaded - Use menu to download a new model',
+                                style: TextStyle(
+                                  color: Colors.orange,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            if (isDownloading)
+                              Column(
+                                children: [
+                                  const SizedBox(height: 8),
+                                  LinearProgressIndicator(
+                                    value: downloadProgress,
+                                  ),
+                                  Text(downloadStatus),
+                                ],
+                              ),
+                            if (isListening) ...[
                               Text(
-                                'Model: ${selectedModel.modelName} (${BackgroundSTTService.modelSizes[selectedModel]} MB)',
+                                'Duration: ${_formatDuration(recordingDuration)}',
                                 style: const TextStyle(
+                                  fontSize: 12,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              Icon(
-                                isModelLoaded
-                                    ? Icons.check_circle
-                                    : Icons.warning,
-                                color: isModelLoaded
-                                    ? Colors.green
-                                    : Colors.orange,
-                                size: 16,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            BackgroundSTTService.getRamStatus(selectedModel),
-                            style: TextStyle(
-                              color: isRamInsufficient ? Colors.red : null,
-                              fontWeight: isRamInsufficient
-                                  ? FontWeight.bold
-                                  : null,
-                            ),
-                          ),
-                          if (!isModelLoaded && !BackgroundSTTService.isLoading)
-                            const Text(
-                              '⚠️ Model unloaded - Use menu to download a new model',
-                              style: TextStyle(
-                                color: Colors.orange,
-                                fontSize: 12,
-                              ),
-                            ),
-                          if (isDownloading)
-                            Column(
-                              children: [
-                                const SizedBox(height: 8),
-                                LinearProgressIndicator(
-                                  value: downloadProgress,
-                                ),
-                                Text(downloadStatus),
-                              ],
-                            ),
-                          if (isListening) ...[
-                            Text(
-                              'Duration: ${_formatDuration(recordingDuration)}',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
 
-                            if (showOptionView) ...[
-                              Wrap(
-                                alignment: WrapAlignment.center,
-                                spacing: 8.0,
-                                runSpacing: 8.0,
-                                children: [
-                                  // waveform instantanée
-                                  Container(
-                                    height: 100,
-                                    padding: EdgeInsets.all(8.0),
-                                    child: SingleChildScrollView(
-                                      scrollDirection: Axis.horizontal,
-                                      child: BackgroundAudioLiveWaveform(
-                                        colorStart: Colors.blueAccent.shade100,
-                                        color: Colors.blue.shade700,
-                                        colorEnd: Colors.blueAccent.shade100,
-                                        countBar: 30,
+                              if (showOptionView) ...[
+                                Wrap(
+                                  alignment: WrapAlignment.center,
+                                  spacing: 8.0,
+                                  runSpacing: 8.0,
+                                  children: [
+                                    // waveform instantanée
+                                    Container(
+                                      height: 100,
+                                      padding: EdgeInsets.all(8.0),
+                                      child: SingleChildScrollView(
+                                        scrollDirection: Axis.horizontal,
+                                        child: BackgroundAudioLiveWaveform(
+                                          colorStart:
+                                              Colors.blueAccent.shade100,
+                                          color: Colors.blue.shade700,
+                                          colorEnd: Colors.blueAccent.shade100,
+                                          countBar: 30,
+                                        ),
                                       ),
                                     ),
-                                  ),
 
-                                  // waveform historique
-                                  Container(
-                                    height: 100,
-                                    padding: EdgeInsets.all(8.0),
-                                    child: SingleChildScrollView(
-                                      scrollDirection: Axis.horizontal,
-                                      child:
-                                          BackgroundAudioLiveHistoricWaveform(
-                                            colorStart: Colors.redAccent,
-                                            color: Colors.purpleAccent,
-                                            colorEnd: Colors.blueAccent,
-                                            countBar: 30,
-                                          ),
+                                    // waveform historique
+                                    Container(
+                                      height: 100,
+                                      padding: EdgeInsets.all(8.0),
+                                      child: SingleChildScrollView(
+                                        scrollDirection: Axis.horizontal,
+                                        child:
+                                            BackgroundAudioLiveHistoricWaveform(
+                                              colorStart: Colors.redAccent,
+                                              color: Colors.purpleAccent,
+                                              colorEnd: Colors.blueAccent,
+                                              countBar: 30,
+                                            ),
+                                      ),
                                     ),
-                                  ),
 
-                                  // jauge simple
-                                  Container(
-                                    width: 55,
-                                    height: 26,
-                                    padding: EdgeInsets.all(8.0),
+                                    // jauge simple
+                                    Container(
+                                      width: 55,
+                                      height: 26,
+                                      padding: EdgeInsets.all(8.0),
 
-                                    child: BackgroundAudioLiveSingleWaveform(
-                                      colorStart: Colors.blueAccent.shade700,
-                                      color: Colors.purpleAccent,
-                                      colorEnd: Colors.blueAccent.shade200,
-                                      orientation:
-                                          WaveformOrientation.horizontal,
-                                      animationDurationMs: 25,
+                                      child: BackgroundAudioLiveSingleWaveform(
+                                        colorStart: Colors.blueAccent.shade700,
+                                        color: Colors.purpleAccent,
+                                        colorEnd: Colors.blueAccent.shade200,
+                                        orientation:
+                                            WaveformOrientation.horizontal,
+                                        animationDurationMs: 25,
+                                      ),
                                     ),
-                                  ),
 
-                                  // jauge simple
-                                  Container(
-                                    width: 30,
-                                    height: 100,
-                                    padding: EdgeInsets.all(8.0),
+                                    // jauge simple
+                                    Container(
+                                      width: 30,
+                                      height: 100,
+                                      padding: EdgeInsets.all(8.0),
 
-                                    child: BackgroundAudioLiveSingleWaveform(
-                                      colorStart: Colors.redAccent,
-                                      color: Colors.purpleAccent,
-                                      colorEnd: Colors.blueAccent,
-                                      orientation: WaveformOrientation.vertical,
+                                      child: BackgroundAudioLiveSingleWaveform(
+                                        colorStart: Colors.redAccent,
+                                        color: Colors.purpleAccent,
+                                        colorEnd: Colors.blueAccent,
+                                        orientation:
+                                            WaveformOrientation.vertical,
+                                      ),
                                     ),
-                                  ),
 
-                                  // jauge simple plus réactif
-                                  Container(
-                                    width: 30,
-                                    height: 100,
-                                    padding: EdgeInsets.all(8.0),
+                                    // jauge simple plus réactif
+                                    Container(
+                                      width: 30,
+                                      height: 100,
+                                      padding: EdgeInsets.all(8.0),
 
-                                    child: BackgroundAudioLiveSingleWaveform(
-                                      colorStart: Colors.redAccent,
-                                      color: Colors.purpleAccent,
-                                      colorEnd: Colors.blueAccent,
-                                      orientation: WaveformOrientation.vertical,
-                                      animationDurationMs: 25,
+                                      child: BackgroundAudioLiveSingleWaveform(
+                                        colorStart: Colors.redAccent,
+                                        color: Colors.purpleAccent,
+                                        colorEnd: Colors.blueAccent,
+                                        orientation:
+                                            WaveformOrientation.vertical,
+                                        animationDurationMs: 25,
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ),
+                                  ],
+                                ),
+                              ],
                             ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Switch(
-                        value: showOptionView,
-                        onChanged: (value) {
-                          setState(() {
-                            showOptionView = value;
-                          });
-                        },
-                      ),
-                      const Text('Display waveform'),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    instructionsText,
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      child: Text(
-                        transcribedText,
-                        style: Theme.of(context).textTheme.bodySmall,
+
+                    // Section des modèles téléchargés
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.folder),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'Model downloaded',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                const Spacer(),
+                                if (_isLoadingModels)
+                                  const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            if (_downloadedModels.isEmpty)
+                              const Text(
+                                'No models downloaded yet',
+                                style: TextStyle(
+                                  fontStyle: FontStyle.italic,
+                                  color: Colors.grey,
+                                ),
+                              )
+                            else
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: _downloadedModels.map((model) {
+                                  final isCurrentModel = selectedModel == model;
+                                  final canDelete =
+                                      _downloadedModels.length > 1;
+                                  final sizeMB =
+                                      BackgroundSTTService.modelSizes[model] ??
+                                      0;
+
+                                  return GestureDetector(
+                                    onTap: isCurrentModel
+                                        ? null
+                                        : () => _loadModelFromList(model),
+                                    child: Container(
+                                      margin: const EdgeInsets.only(bottom: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isCurrentModel
+                                            ? Colors.blue.shade50
+                                            : null,
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(
+                                          color: isCurrentModel
+                                              ? Colors.blue.shade200
+                                              : Colors.grey.shade300,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            isCurrentModel
+                                                ? Icons.check_circle
+                                                : Icons.model_training,
+                                            color: isCurrentModel
+                                                ? Colors.blue
+                                                : Colors.grey,
+                                            size: 16,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  model.modelName,
+                                                  style: TextStyle(
+                                                    fontWeight: isCurrentModel
+                                                        ? FontWeight.bold
+                                                        : null,
+                                                    color: isCurrentModel
+                                                        ? null
+                                                        : (canDelete
+                                                              ? null
+                                                              : Colors
+                                                                    .grey
+                                                                    .shade600),
+                                                  ),
+                                                ),
+                                                Text(
+                                                  '$sizeMB MB',
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.grey,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          if (canDelete)
+                                            IconButton(
+                                              onPressed: () =>
+                                                  _deleteModel(model),
+                                              icon: const Icon(
+                                                Icons.delete,
+                                                color: Colors.red,
+                                                size: 18,
+                                              ),
+                                              tooltip: 'Supprimer ce modèle',
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(
+                                                minWidth: 24,
+                                                minHeight: 24,
+                                              ),
+                                            )
+                                          else
+                                            Tooltip(
+                                              message:
+                                                  'Impossible de supprimer le dernier modèle',
+                                              child: Icon(
+                                                Icons.delete,
+                                                color: Colors.grey.shade400,
+                                                size: 18,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
+
+                    // Option pour afficher la vue d'options
+                    Row(
+                      children: [
+                        Switch(
+                          value: showOptionView,
+                          onChanged: (value) {
+                            setState(() {
+                              showOptionView = value;
+                            });
+                          },
+                        ),
+                        const Text('Display waveform'),
+                      ],
+                    ),
+
+                    // Affichage des instructions
+                    Text(
+                      instructionsText,
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+
+                    // Affichage du texte transcrit
+                    Text(
+                      transcribedText,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+
+                    // footer
+                    const SizedBox(height: 75),
+                  ],
+                ),
               ),
               Positioned(
                 bottom: 24,
