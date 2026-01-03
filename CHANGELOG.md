@@ -30,21 +30,6 @@
   - Support des permissions multiplateformes
   - Transcription d'exemples audio (jfk.wav)
 
-### 🔧 Améliorations Techniques
-- Architecture modulaire avec separation des responsabilités
-- Gestion d'erreurs robuste avec suggestions utilisateur
-- Streams Reactifs pour les mises à jour en temps réel
-- Support complet des plateformes (Android, iOS, macOS, Windows, Linux)
-- Optimisation mémoire avec déchargement automatique des modèles
-- Gestion intelligente des fallbacks en cas d'erreur de détection
-
-### 📱 Support Multiplateforme
-- **Android** : Support complet avec permissions dynamiques
-- **iOS** : Détection précise de RAM par modèle d'appareil
-- **macOS** : Intégration native avec les outils système
-- **Windows** : Support via WMI
-- **Linux** : Lecture directe des informations système
-
 ### 🎯 Fonctionnalités Avancées
 - Transcription temps réel avec chronométrage précis
 - Gestion des erreurs spécifiques Whisper avec suggestions
