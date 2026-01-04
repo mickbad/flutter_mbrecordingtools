@@ -1,3 +1,7 @@
+## 1.0.0+1
+
+- Mise à jour des paquets dépendances
+
 ## 1.0.0
 
 ### ✨ Nouvelles Fonctionnalités

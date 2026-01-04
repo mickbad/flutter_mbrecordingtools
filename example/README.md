@@ -9,8 +9,11 @@ CONFIGURATION GÉNÉRALE
 Ajoutez le plugin à votre pubspec.yaml :
 
 ```yaml
-dependencies:
-  mbrecordingtools: ^1.0.0
+  # librairie ricochets.dev
+  mbrecordingtools:
+    git:
+      url: https://github.com/mickbad/flutter_mbrecordingtools.git
+      ref: [VERSION]
 ```
 
 Puis importez-le dans votre code :
