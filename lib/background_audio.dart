@@ -56,7 +56,7 @@ class BackgroundAudioService {
       // Initialisation avec gestion d'erreur
       try {
         await notifications.initialize(
-          initSettings,
+          settings: initSettings,
           onDidReceiveNotificationResponse: (NotificationResponse response) {
             debugPrint(
                 '[BackgroundAudioService] Notification tap: ${response.payload}');
@@ -128,6 +128,80 @@ class BackgroundAudioService {
     }
   }
 
+  ///
+  /// Récupère la liste des dispositifs audio d'entrée disponibles
+  ///
+  static Future<List<Map<String, dynamic>>> getAudioInputDevices() async {
+    // Sur Web - retourne le dispositif par défaut
+    if (kIsWeb) {
+      return [
+        {
+          'id': 'default',
+          'name': 'Microphone par défaut',
+          'isDefault': true,
+        }
+      ];
+    }
+
+    // Sur mobile (iOS/Android) - retourne le micro par défaut
+    if (Platform.isIOS || Platform.isAndroid) {
+      return [
+        {
+          'id': 'default',
+          'name': 'Microphone',
+          'isDefault': true,
+        }
+      ];
+    }
+
+    // Sur Desktop - utilise le package record_platform_interface
+    try {
+      if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+        // Récupère les dispositifs via le package record
+        final devices = await _recorder.listInputDevices();
+
+        if (devices.isEmpty) {
+          debugPrint('[BackgroundAudioService] No audio input devices found');
+          return [
+            {
+              'id': 'default',
+              'name': 'Microphone système',
+              'isDefault': true,
+            }
+          ];
+        }
+
+        // Convertir les InputDevice en Map
+        final deviceList = <Map<String, dynamic>>[];
+
+        for (int i = 0; i < devices.length; i++) {
+          final device = devices[i];
+          deviceList.add({
+            'id': device.id,
+            'name': device.label,
+            'isDefault': i == 0, // Le premier est considéré comme défaut
+          });
+
+          debugPrint(
+              '[BackgroundAudioService] Device found: ${device.label} (${device.id})');
+        }
+
+        return deviceList;
+      }
+    } catch (e) {
+      debugPrint('[BackgroundAudioService] Error getting audio devices: $e');
+    }
+
+    // Fallback - retourne un dispositif par défaut
+    return [
+      {
+        'id': 'default',
+        'name': 'Microphone par défaut',
+        'isDefault': true,
+      }
+    ];
+  }
+
   // ===== START BACKGROUND SERVICE =====
   static Future<bool> startBackgroundService() async {
     if (_isBackgroundServiceActive) {
@@ -170,7 +244,10 @@ class BackgroundAudioService {
   }
 
   // ===== START RECORDING =====
-  static Future<bool> start({bool enableBackground = true}) async {
+  static Future<bool> start({
+    bool enableBackground = true,
+    String? deviceId,
+  }) async {
     if (_isRecording) {
       debugPrint(
           '[BackgroundAudioService] Already recording, ignoring start request');
@@ -180,6 +257,13 @@ class BackgroundAudioService {
     _isBackgroundEnabled = enableBackground;
     debugPrint(
         '[BackgroundAudioService] Background service enabled: $enableBackground');
+
+    // Log du dispositif sélectionné
+    if (deviceId != null && deviceId != 'default') {
+      debugPrint('[BackgroundAudioService] Selected device ID: $deviceId');
+    } else {
+      debugPrint('[BackgroundAudioService] Using default microphone');
+    }
 
     // Démarrer le service background si demandé
     if (enableBackground) {
@@ -214,13 +298,17 @@ class BackgroundAudioService {
     }
 
     // Configurer l'enregistrement avec paramètres plus compatibles
-    final config = const RecordConfig(
+    // MODIFICATION : Ajout du deviceId dans la config
+    final config = RecordConfig(
       encoder: AudioEncoder.aacLc,
       sampleRate: 44100,
       numChannels: 1,
       audioInterruption: AudioInterruptionMode.pauseResume,
-      bitRate: 128000, // bitrate explicite
-      //sampleRate: 16000, // Réduire pour plus de compatibilité
+      bitRate: 128000,
+      // Spécifier le dispositif d'entrée si fourni
+      device: deviceId != null && deviceId != 'default'
+          ? InputDevice(id: deviceId, label: '')
+          : null,
     );
 
     // Démarrer l'enregistrement avec gestion d'erreur améliorée
@@ -253,7 +341,8 @@ class BackgroundAudioService {
       // Démarrer le compteur de durée
       _startDurationTimer();
 
-      debugPrint('[BackgroundAudioService] Enregistrement démarré avec succès');
+      debugPrint(
+          '[BackgroundAudioService] Enregistrement démarré avec succès${deviceId != null ? ' avec device: $deviceId' : ''}');
       return true;
     } catch (e, stackTrace) {
       debugPrint('[BackgroundAudioService] Erreur lors du démarrage: $e');
@@ -261,6 +350,7 @@ class BackgroundAudioService {
       _isRecording = false;
 
       // Tenter une approche de fallback avec des paramètres plus simples
+      // SANS le deviceId spécifique cette fois
       try {
         debugPrint(
             '[BackgroundAudioService] Tentative avec paramètres de fallback...');
@@ -268,6 +358,7 @@ class BackgroundAudioService {
           encoder: AudioEncoder.wav,
           sampleRate: 8000,
           numChannels: 1,
+          // Pas de device spécifique en fallback
         );
 
         await _recorder.start(fallbackConfig, path: _currentPath!);
@@ -276,7 +367,7 @@ class BackgroundAudioService {
 
         if (isRecordingFallback) {
           debugPrint(
-              '[BackgroundAudioService] Enregistrement démarré avec paramètres de fallback');
+              '[BackgroundAudioService] Enregistrement démarré avec paramètres de fallback (device par défaut)');
           _listenAmplitude();
           _isRecording = true;
           _startDurationTimer();
