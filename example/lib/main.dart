@@ -957,7 +957,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
           if (result != null) {
             setState(() {
-              transcribedText = result;
+              transcribedText = result.text;
             });
           }
         } catch (e) {
@@ -1014,7 +1014,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
       if (result != null) {
         setState(() {
-          transcribedText = result;
+          transcribedText = result.text;
         });
       }
     } catch (e) {

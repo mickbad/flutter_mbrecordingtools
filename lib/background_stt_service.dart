@@ -681,10 +681,11 @@ class BackgroundSTTService {
 
   // ===== TRANSCRIPTION =====
   /// Transcrit un fichier audio
-  static Future<String?> transcribe({
+  static Future<TranscriptionResults?> transcribe({
     required String audioPath,
     String lang = 'auto',
     WhisperModel? model,
+    bool splitOnWord = false,
   }) async {
     final targetModel = model ?? _currentModel;
 
@@ -713,6 +714,8 @@ class BackgroundSTTService {
         audioPath: audioPath,
         lang: lang,
         diarize: false,
+        withSegments: true,
+        splitOnWord: splitOnWord,
       );
 
       _isTranscribing = false;
@@ -730,7 +733,29 @@ class BackgroundSTTService {
         _transcriptionController.add(_currentTranscription!);
         _statusController.add(_labels.formatMessage(
             _labels.transcriptionCompletedMessage, {'time': timeStr}));
-        return _currentTranscription;
+        
+        // récupération des segments de transcription
+        int index = 0;
+        final List<Segment> localSegments = [];
+        if (result.transcription.segments != null) {
+          for (final segment in result.transcription.segments!) {
+            localSegments.add(Segment(
+              id: index++,
+              start: segment.fromTs,
+              end: segment.toTs,
+              text: segment.text,
+            ));
+          }
+        }
+
+        // récupération des éléments de transcription
+        final transcription = TranscriptionResults(
+          text: _currentTranscription!,
+          segments: localSegments,
+          time: timeStr,
+        );
+        
+        return transcription;
       } else {
         _statusController.add(_labels.formatMessage(
             _labels.transcriptionEmptyMessage, {'time': timeStr}));
@@ -844,12 +869,12 @@ class BackgroundSTTService {
 }
 
 /// Résultat de transcription avec texte et timestamps
-class TranscriptionResult {
+class TranscriptionResults {
   final String text;
   final List<Segment> segments;
   final String time;
 
-  TranscriptionResult({
+  TranscriptionResults({
     required this.text,
     required this.segments,
     required this.time,
@@ -859,8 +884,8 @@ class TranscriptionResult {
 /// Segment de transcription avec timestamps
 class Segment {
   final int id;
-  final double start;
-  final double end;
+  final Duration start;
+  final Duration end;
   final String text;
 
   Segment({
@@ -872,6 +897,6 @@ class Segment {
 
   @override
   String toString() {
-    return '$text (${start.toStringAsFixed(2)}s - ${end.toStringAsFixed(2)}s)';
+    return '$text ($start -> $end)';
   }
 }
